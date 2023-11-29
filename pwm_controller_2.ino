@@ -10,6 +10,9 @@
  *
  */
 #include <shButton.h>
+#include <EEPROM.h>
+
+const uint16_t eeprom_index = 10;
 
 const uint8_t led_1_pin = 3;
 const uint8_t led_2_pin = 4;
@@ -19,6 +22,18 @@ const uint8_t led_4_pin = 6;
 const uint8_t pwm_out = 10;
 
 const uint8_t btn_pin = 7;
+
+// считывание сохраненного значения ШИМ
+uint8_t read_pwm_data()
+{
+  return (EEPROM.read(eeprom_index));
+}
+
+// сохранение нового значения ШИМ
+void write_pwm_data(uint8_t _data)
+{
+  EEPROM.update(eeprom_index, _data);
+}
 
 class Heater
 {
@@ -59,6 +74,10 @@ public:
       old_data = pwm_data;
       analogWrite(pwm_pin, pwm_data);
       set_led_state();
+      if (pwm_data > 0)
+      {
+        write_pwm_data(pwm_data);
+      }
     }
   }
 };
@@ -67,24 +86,33 @@ shButton btn(btn_pin);
 
 Heater heater;
 
+// опрос кнопки
 void check_button()
 {
-  uint8_t x;
-
   switch (btn.getButtonState())
   {
   case BTN_ONECLICK: // при однократном клике мощность нагревателя увеличивается на один пункт по кругу;
+    uint8_t x;
     x = heater.get_pwm_data();
-    x += 60;
-    if (x > 240)
+    if (x == 0 && read_pwm_data() > 0)
     {
-      x = 60;
+      // если ШИМ отключен, и в памяти есть сохраненное значение, то запустить нагреватель с сохраненным значением
+      x = read_pwm_data();
     }
+    else
+    {
+      // иначе изменить текущий уровень ШИМ
+      x += 60;
+      if (x > 240)
+      {
+        x = 60;
+      }
+    }
+    heater.set_pwm_data(x);
     break;
   case BTN_LONGCLICK: // при удержании кнопки в течение двух секунд нагреватель отключается
-    x = 0;
+    heater.set_pwm_data(0);
   }
-  heater.set_pwm_data(0);
 }
 
 void setup()
@@ -92,6 +120,14 @@ void setup()
   btn.setVirtualClickOn();
   btn.setLongClickMode(LCM_ONLYONCE);
   btn.setTimeoutOfLongClick(2000);
+
+  // если в памяти записано некорректное значение (0xFF), устанавливаем минимальный уровень
+  if (read_pwm_data() > 240)
+  {
+    write_pwm_data(60);
+  }
+  // запускаем нагреватель с сохраненным уровнем ШИМ
+  heater.set_pwm_data(read_pwm_data());
 }
 
 void loop()
