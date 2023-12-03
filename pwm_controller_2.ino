@@ -13,7 +13,7 @@
  *   - первый светодиод линейки двухцветный, красный цвет зажигается, если нагреватель отключен (pwm_data == 0);
  *
  * @version 1.0
- * @date 29.11.2023
+ * @date 03.12.2023
  *
  * @copyright Copyright (c) 2023
  *
@@ -23,10 +23,10 @@
 
 const uint16_t eeprom_index = 10;
 
-const uint8_t led_1_pin = 4;
-const uint8_t led_2_pin = 5;
-const uint8_t led_3_pin = 6;
-const uint8_t led_4_pin = 7;
+const uint8_t led_1_pin = 7;
+const uint8_t led_2_pin = 6;
+const uint8_t led_3_pin = 5;
+const uint8_t led_4_pin = 4;
 const uint8_t led_off_pin = 8;
 
 const uint8_t pwm_out = 10;
@@ -92,6 +92,7 @@ public:
       {
         write_pwm_data(pwm_data);
       }
+      Serial.print("pwm_data: "); Serial.println(pwm_data);
       write_on_off_pwm_state((bool)pwm_data);
     }
   }
@@ -122,7 +123,7 @@ void check_button()
     {
       // иначе изменить текущий уровень ШИМ
       x += 60;
-      if (x > 240)
+      if (x > 240 || x < 60)
       {
         x = 60;
       }
@@ -136,6 +137,8 @@ void check_button()
 
 void setup()
 {
+  Serial.begin(9600);
+
   btn.setVirtualClickOn();
   btn.setLongClickMode(LCM_ONLYONCE);
   btn.setTimeoutOfLongClick(2000);
@@ -150,6 +153,8 @@ void setup()
   {
     heater.set_pwm_data(read_pwm_data());
   }
+
+  Serial.println("Device started");
 }
 
 void loop()
