@@ -1,17 +1,17 @@
 /**
  * @file pwm_controller_2.ino
  * @author Vladimir Shatalov (valesh-soft@yandex.ru)
- * @brief Управление нагревателем с помощью ШИМ и управлением одной кнопкой; 
- * 
- * Управление: 
+ * @brief Управление нагревателем с помощью ШИМ и управлением одной кнопкой;
+ *
+ * Управление:
  *   - нагреватель имеет четыре уровня мощности;
  *   - изменение уровня выполняется кликом кнопкой; перебор уровней закольцован - при максимальном уровне клик кнопкой включает минимальный уровень;
  *   - удержание кнопки нажатой в течение 2 секунд отключает нагреватель;
- * 
+ *
  * Индикация:
  *   - текущий уровень мощности индицируется линейкой из четырех светодиодов;
  *   - первый светодиод линейки двухцветный, красный цвет зажигается, если нагреватель отключен (pwm_data == 0);
- * 
+ *
  * @version 1.0
  * @date 29.11.2023
  *
@@ -23,15 +23,15 @@
 
 const uint16_t eeprom_index = 10;
 
-const uint8_t led_1_pin = 3;
-const uint8_t led_2_pin = 4;
-const uint8_t led_3_pin = 5;
-const uint8_t led_4_pin = 6;
+const uint8_t led_1_pin = 4;
+const uint8_t led_2_pin = 5;
+const uint8_t led_3_pin = 6;
+const uint8_t led_4_pin = 7;
 const uint8_t led_off_pin = 8;
 
 const uint8_t pwm_out = 10;
 
-const uint8_t btn_pin = 7;
+const uint8_t btn_pin = 3;
 
 // считывание сохраненного значения ШИМ из EEPROM
 uint8_t read_pwm_data() { return (EEPROM.read(eeprom_index)); }
@@ -58,11 +58,11 @@ private:
 
   void set_led_state()
   {
-    digitalWrite(led_off, pwm_data == 0);
-    digitalWrite(led_1, pwm_data >= 60);
-    digitalWrite(led_2, pwm_data >= 120);
-    digitalWrite(led_3, pwm_data >= 180);
-    digitalWrite(led_4, pwm_data >= 240);
+    digitalWrite(led_off, (pwm_data == 0));
+    digitalWrite(led_1, (pwm_data >= 60));
+    digitalWrite(led_2, (pwm_data >= 120));
+    digitalWrite(led_3, (pwm_data >= 180));
+    digitalWrite(led_4, (pwm_data >= 240));
   }
 
 public:
@@ -106,13 +106,17 @@ void check_button()
 {
   switch (btn.getButtonState())
   {
-  case BTN_ONECLICK: // при однократном клике мощность нагревателя увеличивается на один пункт по кругу;
+  case BTN_ONECLICK: // при однократном клике мощность нагревателя изменяется на один пункт по кругу;
     uint8_t x;
     x = heater.get_pwm_data();
-    if (x == 0 && read_pwm_data() > 0)
+    if (x == 0)
     {
-      // если ШИМ отключен, и в памяти есть сохраненное значение, то запустить нагреватель с сохраненным значением
+      // если ШИМ отключен, запустить нагреватель с сохраненным значением
       x = read_pwm_data();
+      if (x == 0 || x > 240)
+      {
+        x = 60;
+      }
     }
     else
     {
