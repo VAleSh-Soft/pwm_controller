@@ -4,16 +4,16 @@
  * @brief Управление нагревателем с помощью ШИМ и управлением одной кнопкой;
  *
  * Управление:
- *   - нагреватель имеет четыре уровня мощности;
- *   - изменение уровня выполняется кликом кнопкой; перебор уровней закольцован - при максимальном уровне клик кнопкой включает минимальный уровень;
+ *   - нагреватель имеет четыре уровня мощности: 100, 150, 200, 250 т.е. примерно 39%, 59%, 78% и 98%;
+ *   - изменение уровня выполняется одной кнопкой; перебор уровней закольцован - при максимальном уровне клик кнопкой включает минимальный уровень;
  *   - удержание кнопки нажатой в течение 2 секунд отключает нагреватель;
  *
  * Индикация:
  *   - текущий уровень мощности индицируется линейкой из четырех светодиодов;
  *   - первый светодиод линейки двухцветный, красный цвет зажигается, если нагреватель отключен (pwm_data == 0);
  *
- * @version 1.0
- * @date 03.12.2023
+ * @version 1.1
+ * @date 06.12.2023
  *
  * @copyright Copyright (c) 2023
  *
@@ -59,10 +59,10 @@ private:
   void set_led_state()
   {
     digitalWrite(led_off, (pwm_data == 0));
-    digitalWrite(led_1, (pwm_data >= 60));
-    digitalWrite(led_2, (pwm_data >= 120));
-    digitalWrite(led_3, (pwm_data >= 180));
-    digitalWrite(led_4, (pwm_data >= 240));
+    digitalWrite(led_1, (pwm_data >= 100));
+    digitalWrite(led_2, (pwm_data >= 150));
+    digitalWrite(led_3, (pwm_data >= 200));
+    digitalWrite(led_4, (pwm_data >= 250));
   }
 
 public:
@@ -87,14 +87,15 @@ public:
     {
       old_data = pwm_data;
       analogWrite(pwm_pin, pwm_data);
-      set_led_state();
       if (pwm_data > 0)
       {
         write_pwm_data(pwm_data);
       }
-      Serial.print("pwm_data: "); Serial.println(pwm_data);
+      Serial.print("pwm_data: ");
+      Serial.println(pwm_data);
       write_on_off_pwm_state((bool)pwm_data);
     }
+    set_led_state();
   }
 };
 
@@ -114,18 +115,18 @@ void check_button()
     {
       // если ШИМ отключен, запустить нагреватель с сохраненным значением
       x = read_pwm_data();
-      if (x == 0 || x > 240)
+      if (x == 0 || x > 250)
       {
-        x = 60;
+        x = 100;
       }
     }
     else
     {
       // иначе изменить текущий уровень ШИМ
-      x += 60;
-      if (x > 240 || x < 60)
+      x += 50;
+      if (x < 100)
       {
-        x = 60;
+        x = 100;
       }
     }
     heater.set_pwm_data(x);
@@ -139,14 +140,16 @@ void setup()
 {
   Serial.begin(9600);
 
+  TCCR1B = TCCR1B & B11111000 | B00000001; //увеличиваем частоту ШИМ до 31372.55 Гц
+
   btn.setVirtualClickOn();
   btn.setLongClickMode(LCM_ONLYONCE);
   btn.setTimeoutOfLongClick(2000);
 
   // если в памяти записано некорректное значение (0xFF или 0x00), устанавливаем минимальный уровень
-  if (read_pwm_data() > 240 || read_pwm_data() == 0)
+  if (read_pwm_data() > 250 || read_pwm_data() == 0)
   {
-    write_pwm_data(60);
+    write_pwm_data(100);
   }
   // запускаем нагреватель с сохраненным уровнем ШИМ
   if (read_on_off_pwm_state())
