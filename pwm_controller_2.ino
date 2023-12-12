@@ -12,8 +12,8 @@
  *   - текущий уровень мощности индицируется линейкой из четырех светодиодов;
  *   - первый светодиод линейки двухцветный, красный цвет зажигается, если нагреватель отключен (pwm_data == 0);
  *
- * @version 1.1
- * @date 06.12.2023
+ * @version 1.2
+ * @date 12.12.2023
  *
  * @copyright Copyright (c) 2023
  *
@@ -103,22 +103,28 @@ shButton btn(btn_pin);
 
 Heater heater;
 
+uint8_t get_start_pwm()
+{
+  uint8_t x = read_pwm_data();
+  if (x < 100 || x > 250)
+  {
+    x = 100;
+  }
+  return (x);
+}
+
 // опрос кнопки
 void check_button()
 {
+  uint8_t x = heater.get_pwm_data();
+
   switch (btn.getButtonState())
   {
   case BTN_ONECLICK: // при однократном клике мощность нагревателя изменяется на один пункт по кругу;
-    uint8_t x;
-    x = heater.get_pwm_data();
     if (x == 0)
     {
       // если ШИМ отключен, запустить нагреватель с сохраненным значением
-      x = read_pwm_data();
-      if (x == 0 || x > 250)
-      {
-        x = 100;
-      }
+      x = get_start_pwm();
     }
     else
     {
@@ -131,8 +137,18 @@ void check_button()
     }
     heater.set_pwm_data(x);
     break;
-  case BTN_LONGCLICK: // при удержании кнопки в течение двух секунд нагреватель отключается
-    heater.set_pwm_data(0);
+  case BTN_LONGCLICK: // при удержании кнопки в течение одной секунды нагреватель отключается или включается
+    if (x == 0)
+    {
+      // если ШИМ отключен, запустить нагреватель с сохраненным значением
+      x = get_start_pwm();
+    }
+    else
+    {
+      // иначе отключить нагреватель
+      x = 0;
+    }
+    heater.set_pwm_data(x);
   }
 }
 
@@ -140,11 +156,11 @@ void setup()
 {
   Serial.begin(9600);
 
-  TCCR1B = TCCR1B & B11111000 | B00000001; //увеличиваем частоту ШИМ до 31372.55 Гц
+  TCCR1B = TCCR1B & B11111000 | B00000001; // увеличиваем частоту ШИМ до 31372.55 Гц
 
   btn.setVirtualClickOn();
   btn.setLongClickMode(LCM_ONLYONCE);
-  btn.setTimeoutOfLongClick(2000);
+  btn.setTimeoutOfLongClick(1000);
 
   // если в памяти записано некорректное значение (0xFF или 0x00), устанавливаем минимальный уровень
   if (read_pwm_data() > 250 || read_pwm_data() == 0)
