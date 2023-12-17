@@ -4,16 +4,16 @@
  * @brief Управление нагревателем с помощью ШИМ и управлением одной кнопкой;
  *
  * Управление:
- *   - нагреватель имеет четыре уровня мощности: 100, 150, 200, 250 т.е. примерно 39%, 59%, 78% и 98%;
+ *   - нагреватель имеет четыре уровня мощности: pwm_data == {100, 150, 200, 250} т.е. примерно 39%, 59%, 78% и 98%;
  *   - изменение уровня выполняется одной кнопкой; перебор уровней закольцован - при максимальном уровне клик кнопкой включает минимальный уровень;
- *   - удержание кнопки нажатой в течение 2 секунд отключает нагреватель;
+ *   - удержание кнопки нажатой в течение 1 секунды отключает нагреватель;
  *
  * Индикация:
  *   - текущий уровень мощности индицируется линейкой из четырех светодиодов;
  *   - первый светодиод линейки двухцветный, красный цвет зажигается, если нагреватель отключен (pwm_data == 0);
  *
- * @version 1.2
- * @date 12.12.2023
+ * @version 1.3
+ * @date 17.12.2023
  *
  * @copyright Copyright (c) 2023
  *
@@ -32,18 +32,6 @@ const uint8_t led_off_pin = 8;
 const uint8_t pwm_out = 10;
 
 const uint8_t btn_pin = 3;
-
-// считывание сохраненного значения ШИМ из EEPROM
-uint8_t read_pwm_data() { return (EEPROM.read(eeprom_index)); }
-
-// сохранение нового значения ШИМ в EEPROM
-void write_pwm_data(uint8_t _data) { EEPROM.update(eeprom_index, _data); }
-
-// считывание флага запуска ШИМ
-bool read_on_off_pwm_state() { return ((bool)EEPROM.read(eeprom_index + 1)); }
-
-// запись флага запуска ШИМ
-void write_on_off_pwm_state(bool _flag) { EEPROM.update(eeprom_index + 1, _flag); }
 
 class Heater
 {
@@ -89,11 +77,11 @@ public:
       analogWrite(pwm_pin, pwm_data);
       if (pwm_data > 0)
       {
-        write_pwm_data(pwm_data);
+        EEPROM.update(eeprom_index, pwm_data);
       }
       Serial.print("pwm_data: ");
       Serial.println(pwm_data);
-      write_on_off_pwm_state((bool)pwm_data);
+      EEPROM.update(eeprom_index + 1, (bool)pwm_data);
     }
     set_led_state();
   }
@@ -103,12 +91,15 @@ shButton btn(btn_pin);
 
 Heater heater;
 
+// получение и валидация сохраненного в EEPROM значения ШИМ
 uint8_t get_start_pwm()
 {
-  uint8_t x = read_pwm_data();
+  uint8_t x = EEPROM.read(eeprom_index);
   if (x < 100 || x > 250)
+  // если в памяти записано некорректное значение, устанавливаем минимальный уровень ШИМ
   {
     x = 100;
+    EEPROM.update(eeprom_index, x);
   }
   return (x);
 }
@@ -162,15 +153,10 @@ void setup()
   btn.setLongClickMode(LCM_ONLYONCE);
   btn.setTimeoutOfLongClick(1000);
 
-  // если в памяти записано некорректное значение (0xFF или 0x00), устанавливаем минимальный уровень
-  if (read_pwm_data() > 250 || read_pwm_data() == 0)
-  {
-    write_pwm_data(100);
-  }
   // запускаем нагреватель с сохраненным уровнем ШИМ
-  if (read_on_off_pwm_state())
+  if ((bool)EEPROM.read(eeprom_index + 1))
   {
-    heater.set_pwm_data(read_pwm_data());
+    heater.set_pwm_data(get_start_pwm());
   }
 
   Serial.println("Device started");
