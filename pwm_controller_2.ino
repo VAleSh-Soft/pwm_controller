@@ -33,23 +33,25 @@ const uint8_t led_3_pin = 5;
 const uint8_t led_4_pin = 4;
 const uint8_t led_off_pin = 8;
 
-const uint8_t pwm_out = 10;
+const uint8_t pwm_out_pin = 10;
 
-const uint8_t btn_pin = 3;
+const uint8_t btn_up_pin = 3;
+const uint8_t btn_down_pin = 2;
 #elif __DIGISPARK__
 const uint8_t led_1_pin = 1;
 const uint8_t led_off_pin = 0;
 
-const uint8_t pwm_out = 4;
+const uint8_t pwm_out_pin = 4;
 
-const uint8_t btn_pin = 3;
+const uint8_t btn_up_pin = 2;
+const uint8_t btn_down_pin = 3;
 #endif
 
 class Heater
 {
 private:
   uint8_t pwm_data = 0;
-  uint8_t pwm_pin = pwm_out;
+  uint8_t pwm_pin = pwm_out_pin;
   uint8_t led_1 = led_1_pin;
 #if __ARDUINO__
   uint8_t led_2 = led_2_pin;
@@ -106,7 +108,8 @@ public:
   }
 };
 
-shButton btn(btn_pin);
+shButton btn_up(btn_up_pin);
+shButton btn_down(btn_down_pin);
 
 Heater heater;
 
@@ -128,26 +131,12 @@ void check_button()
 {
   uint8_t x = heater.get_pwm_data();
 
-  switch (btn.getButtonState())
+  btn_up.getButtonState();
+  btn_down.getButtonState();
+
+  // при удержании кнопки в течение одной секунды нагреватель отключается или включается
+  if (btn_up.getLastState() == BTN_LONGCLICK || btn_down.getLastState() == BTN_LONGCLICK)
   {
-  case BTN_ONECLICK: // при однократном клике мощность нагревателя изменяется на один пункт по кругу;
-    if (x == 0)
-    {
-      // если ШИМ отключен, запустить нагреватель с сохраненным значением
-      x = get_start_pwm();
-    }
-    else
-    {
-      // иначе изменить текущий уровень ШИМ
-      x += 50;
-      if (x < 100)
-      {
-        x = 100;
-      }
-    }
-    heater.set_pwm_data(x);
-    break;
-  case BTN_LONGCLICK: // при удержании кнопки в течение одной секунды нагреватель отключается или включается
     if (x == 0)
     {
       // если ШИМ отключен, запустить нагреватель с сохраненным значением
@@ -160,22 +149,45 @@ void check_button()
     }
     heater.set_pwm_data(x);
   }
+  // при однократном клике мощность нагревателя изменяется на один пункт по кругу в сторону, определенную нажатой кнопкой
+  else if (btn_up.getLastState() == BTN_ONECLICK || btn_down.getLastState() == BTN_ONECLICK)
+  {
+    if (x == 0)
+    {
+      // если ШИМ отключен, запустить нагреватель с сохраненным значением
+      x = get_start_pwm();
+    }
+    else
+    {
+      // иначе изменить текущий уровень ШИМ
+      x = (btn_up.getLastState() == BTN_ONECLICK) ? x + 50 : x - 50;
+      if (x < 100)
+      {
+        x = (btn_up.getLastState() == BTN_ONECLICK) ? 100 : 250;
+      }
+    }
+    heater.set_pwm_data(x);
+  }
+
 }
 
 void setup()
 {
   Serial.begin(9600);
 
-// увеличиваем частоту ШИМ до 31372.55 Гц
+// увеличиваем частоту ШИМ
 #if __ARDUINO__
   TCCR1B = TCCR1B & B11111000 | B00000001; // на пинах D9 и D10 (timer1) до 31372.55 Гц
 #elif __DIGISPARK__
-  TCCR1 = TCCR1 & B11110000 | B00000001; // на пине PB4 (timer1) до 3968.25 Гц
+  TCCR1 = TCCR1 & B11110000 | B00000001; // на пине PB4 (timer1) до 32.2 кГц
 #endif
 
-  btn.setVirtualClickOn();
-  btn.setLongClickMode(LCM_ONLYONCE);
-  btn.setTimeoutOfLongClick(1000);
+  btn_up.setVirtualClickOn();
+  btn_up.setLongClickMode(LCM_ONLYONCE);
+  btn_up.setTimeoutOfLongClick(1000);
+  btn_down.setVirtualClickOn();
+  btn_down.setLongClickMode(LCM_ONLYONCE);
+  btn_down.setTimeoutOfLongClick(1000);
 
   // запускаем нагреватель с сохраненным уровнем ШИМ
   if ((bool)EEPROM.read(eeprom_index + 1))
