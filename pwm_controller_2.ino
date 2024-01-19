@@ -18,11 +18,15 @@
  * @copyright Copyright (c) 2023
  *
  */
+#define __ARDUINO__ defined(__AVR_ATmega328P__) || defined(__AVR_ATmega328PB__) || defined(__AVR_ATmega328__) || defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__)
+#define __DIGISPARK__ defined(__AVR_ATtiny85__) || defined(__AVR_ATtiny45__)
+
 #include <shButton.h>
 #include <EEPROM.h>
 
 const uint16_t eeprom_index = 10;
 
+#if __ARDUINO__
 const uint8_t led_1_pin = 7;
 const uint8_t led_2_pin = 6;
 const uint8_t led_3_pin = 5;
@@ -32,6 +36,14 @@ const uint8_t led_off_pin = 8;
 const uint8_t pwm_out = 10;
 
 const uint8_t btn_pin = 3;
+#elif __DIGISPARK__
+const uint8_t led_1_pin = 1;
+const uint8_t led_off_pin = 0;
+
+const uint8_t pwm_out = 4;
+
+const uint8_t btn_pin = 3;
+#endif
 
 class Heater
 {
@@ -39,27 +51,34 @@ private:
   uint8_t pwm_data = 0;
   uint8_t pwm_pin = pwm_out;
   uint8_t led_1 = led_1_pin;
+#if __ARDUINO__
   uint8_t led_2 = led_2_pin;
   uint8_t led_3 = led_3_pin;
   uint8_t led_4 = led_4_pin;
+#endif
   uint8_t led_off = led_off_pin;
 
   void set_led_state()
   {
     digitalWrite(led_off, (pwm_data == 0));
     digitalWrite(led_1, (pwm_data >= 100));
+#if __ARDUINO__
     digitalWrite(led_2, (pwm_data >= 150));
     digitalWrite(led_3, (pwm_data >= 200));
     digitalWrite(led_4, (pwm_data >= 250));
+#endif
   }
 
 public:
   Heater()
   {
     pinMode(led_1, OUTPUT);
+#if __ARDUINO__
     pinMode(led_2, OUTPUT);
     pinMode(led_3, OUTPUT);
     pinMode(led_4, OUTPUT);
+#endif
+    pinMode(led_off, OUTPUT);
     pinMode(pwm_pin, OUTPUT);
   }
 
@@ -147,7 +166,12 @@ void setup()
 {
   Serial.begin(9600);
 
-  TCCR1B = TCCR1B & B11111000 | B00000001; // увеличиваем частоту ШИМ до 31372.55 Гц
+// увеличиваем частоту ШИМ до 31372.55 Гц
+#if __ARDUINO__
+  TCCR1B = TCCR1B & B11111000 | B00000001; // на пинах D9 и D10 (timer1) до 31372.55 Гц
+#elif __DIGISPARK__
+  TCCR1 = TCCR1 & B11110000 | B00000001; // на пине PB4 (timer1) до 3968.25 Гц
+#endif
 
   btn.setVirtualClickOn();
   btn.setLongClickMode(LCM_ONLYONCE);
