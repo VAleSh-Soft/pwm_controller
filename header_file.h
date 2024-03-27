@@ -1,9 +1,19 @@
 #pragma once
 
-#define __ARDUINO__ defined(__AVR_ATmega328P__) || defined(__AVR_ATmega328PB__) || defined(__AVR_ATmega328__) || defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__)
-#define __DIGISPARK__ defined(__AVR_ATtiny85__) || defined(__AVR_ATtiny45__)
+#if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega328PB__) || defined(__AVR_ATmega328__) || defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__)
+#define __ARDUINO__ 1
+#else
+#define __ARDUINO__ 0
+#endif
+
+#if defined(__AVR_ATtiny85__) || defined(__AVR_ATtiny45__)
+#define __DIGISPARK__ 1
+#else
+#define __DIGISPARK__ 0
+#endif
 
 #include <Arduino.h>
+#include <EEPROM.h>
 
 // ==== Настройки ====================================
 
@@ -135,7 +145,8 @@ private:
       {
         analogWrite(pwm_pin, _data);
         LOG_PRINT("pwm_data: ");
-        LOG_PRINTLN(_data);      }
+        LOG_PRINTLN(_data);
+      }
       else
       {
         _data = 0;

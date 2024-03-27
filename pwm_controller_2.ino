@@ -3,8 +3,8 @@
  * @author Vladimir Shatalov (valesh-soft@yandex.ru)
  * @brief Управление нагрузкой с помощью ШИМ;
  *
- * @version 1.7
- * @date 04.02.2024
+ * @version 1.7.1
+ * @date 27.03.2024
  *
  * @copyright Copyright (c) 2023-2024
  *
