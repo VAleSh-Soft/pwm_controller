@@ -3,10 +3,10 @@
  * @author Vladimir Shatalov (valesh-soft@yandex.ru)
  * @brief Управление нагрузкой с помощью ШИМ;
  *
- * @version 1.7.1
- * @date 27.03.2024
+ * @version 1.7.3
+ * @date 29.05.2026
  *
- * @copyright Copyright (c) 2023-2024
+ * @copyright Copyright (c) 2023-2026
  *
  */
 
@@ -14,9 +14,9 @@
 #include <EEPROM.h>
 #include "header_file.h"
 
-shButton btn_up(btn_up_pin);
+shButton btn_up(BTN_UP_PIN);
 #ifdef USE_TWO_BUTTONS
-shButton btn_down(btn_down_pin);
+shButton btn_down(BTN_DOWN_PIN);
 #endif
 
 PWM_Controller pwm_controller;
@@ -25,20 +25,20 @@ PWM_Controller pwm_controller;
 
 void check_button()
 {
-  uint8_t x = pwm_controller.get_pwm_data();
+  int8_t x = pwm_controller.get_pwm_data();
 
   btn_up.getButtonState();
 #ifdef USE_TWO_BUTTONS
   btn_down.getButtonState();
 
-  // при удержании кнопки в течение одной секунды нагрузка отключается или включается
+  // при удержании любой кнопки в течение одной секунды нагрузка отключается или включается
   if (btn_up.getLastState() == BTN_LONGCLICK || btn_down.getLastState() == BTN_LONGCLICK)
 #else
   // при удержании кнопки в течение одной секунды нагрузка отключается или включается
   if (btn_up.getLastState() == BTN_LONGCLICK)
 #endif
   {
-    if (x == 0)
+    if (!pwm_controller.get_pwm_on_flag())
     {
       // если ШИМ отключен, запустить нагрузку с сохраненным значением
       pwm_controller.starting_pwm();
@@ -46,41 +46,45 @@ void check_button()
     else
     {
       // иначе отключить нагрузку
-      pwm_controller.set_pwm_data(0);
+      pwm_controller.power_on_off(false);
     }
   }
-  // при однократном клике мощность нагрузки изменяется на один пункт по кругу в сторону, определенную нажатой кнопкой
+  // при однократном клике мощность нагрузки изменяется на один пункт в сторону, определенную нажатой кнопкой
 #ifdef USE_TWO_BUTTONS
   else if (btn_up.getLastState() == BTN_ONECLICK || btn_down.getLastState() == BTN_ONECLICK)
 #else
   else if (btn_up.getLastState() == BTN_ONECLICK)
 #endif
   {
-    if (x == 0)
+    if (!pwm_controller.get_pwm_on_flag())
     {
-      // если ШИМ отключен, запустить нагрузку с сохраненным значением
+      // если ШИМ отключен, запустить нагрузку с сохраненным в последний раз значением
       pwm_controller.starting_pwm();
     }
     else
     {
       // иначе изменить текущий уровень ШИМ
       (btn_up.getLastState() == BTN_ONECLICK) ? x++ : x--;
+
+      // при выходе за пределы диапазона устанавливаем значение в зависимости от направления изменения
+      // учитывая, закольцован или нет перебор значений ШИМ
       if (x >= sizeof(pwm_data_table))
-      {
+        if (btn_up.getLastState() == BTN_ONECLICK)
+        {
 #ifdef USE_TWO_BUTTONS
-        x = (loop_data_of_pwm) ? 1 : (sizeof(pwm_data_table) - 1);
+          x = (LOOP_DATA_OF_PWM) ? 0 : (sizeof(pwm_data_table) - 1);
 #else
-        x = 1;
+          x = 0;
 #endif
-      }
-      else if (x == 0)
-      {
+        }
+        else
+        {
 #ifdef USE_TWO_BUTTONS
-        x = (loop_data_of_pwm) ? (sizeof(pwm_data_table) - 1) : 1;
+          x = (LOOP_DATA_OF_PWM) ? (sizeof(pwm_data_table) - 1) : 0;
 #else
-        x = (sizeof(pwm_data_table) - 1);
+          x = (sizeof(pwm_data_table) - 1);
 #endif
-      }
+        }
       pwm_controller.set_pwm_data(x);
     }
   }
@@ -108,10 +112,10 @@ void setup()
   btn_down.setTimeoutOfLongClick(1000);
 #endif
 
-  pwm_controller.set_smooth_flag(smooth_start);
+  pwm_controller.set_smooth_flag(SMOOTH_START);
 
   // запускаем нагрузку с сохраненным уровнем ШИМ
-  if ((bool)EEPROM.read(eeprom_index + 1))
+  if ((bool)EEPROM.read(EEPROM_INDEX + 1))
   {
     pwm_controller.starting_pwm();
   }

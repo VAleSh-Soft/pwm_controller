@@ -27,55 +27,51 @@
 #define USE_TWO_BUTTONS
 
 // таблица управления нагревателем, линейная зависимость: например 39%, 59%, 78% и 98%
-// uint8_t pwm_data_table[] = {0, 100, 150, 200, 250};
+// uint8_t const pwm_data_table[] = {100, 150, 200, 250};
 // таблица управления светодиодной лентой, нелинейная зависимость: например 12%, 24%, 49% и 98%
-uint8_t pwm_data_table[] = {0, 30, 45, 68, 102, 150, 255};
+uint8_t const pwm_data_table[] = {30, 60, 125, 255};
 
 #ifdef USE_TWO_BUTTONS
 // закольцевать перебор значений ШИМ кнопками
-bool loop_data_of_pwm = false;
+constexpr bool LOOP_DATA_OF_PWM = false;
 
 #endif
 
 // плавный запуск ШИМ
-bool smooth_start = false;
+constexpr bool SMOOTH_START = true;
 
 // ===================================================
 
-const uint16_t eeprom_index = 10;
-
-// ===================================================
-
-// получение и валидация сохраненного в EEPROM текущего значения ШИМ, возвращает индекс значения в массиве pwm_data_table
-uint8_t get_start_pwm();
-
-// опрос кнопок
-void check_button();
+constexpr uint16_t EEPROM_INDEX = 10;
 
 // ============================================================================
 
 // настройка пинов для подключения кнопок, светодиодов и выхода ШИМ для Arduino
 #if __ARDUINO__
-const uint8_t led_1_pin = 7;
-const uint8_t led_2_pin = 6;
-const uint8_t led_3_pin = 5;
-const uint8_t led_4_pin = 4;
-const uint8_t led_off_pin = 8;
+constexpr uint8_t LED_1_PIN = 7;
+constexpr uint8_t LED_2_PIN = 6;
+constexpr uint8_t LED_3_PIN = 5;
+constexpr uint8_t LED_4_PIN = 4;
+constexpr uint8_t LED_OFF_PIN = 8;
 
-const uint8_t pwm_out_pin = 10;
+constexpr uint8_t PWM_OUT_PIN = 10;
 
-const uint8_t btn_up_pin = 3;
-const uint8_t btn_down_pin = 2;
+constexpr uint8_t BTN_UP_PIN = 3;
+#ifdef USE_TWO_BUTTONS
+constexpr uint8_t BTN_DOWN_PIN = 2;
+#endif
 
 // настройка пинов для подключения кнопок, светодиодов и выхода ШИМ для Attiny45/85
 #elif __DIGISPARK__
-const uint8_t led_1_pin = 1;
-const uint8_t led_off_pin = 0;
+constexpr uint8_t LED_1_PIN = 1;
+constexpr uint8_t LED_OFF_PIN = 0;
 
-const uint8_t pwm_out_pin = 4;
+constexpr uint8_t PWM_OUT_PIN = 4;
 
-const uint8_t btn_up_pin = 2;
-const uint8_t btn_down_pin = 3;
+constexpr uint8_t BTN_UP_PIN = 2;
+#ifdef USE_TWO_BUTTONS
+constexpr uint8_t BTN_DOWN_PIN = 3;
+#endif
 
 #endif
 
@@ -95,20 +91,29 @@ const uint8_t btn_down_pin = 3;
 
 // ===================================================
 
+// получение и валидация сохраненного в EEPROM текущего значения ШИМ, возвращает индекс значения в массиве pwm_data_table
+uint8_t get_start_pwm();
+
+// опрос кнопок
+void check_button();
+
+// ===================================================
+
 class PWM_Controller
 {
 private:
   uint8_t pwm_data_index = 0;
-  uint8_t pwm_pin = pwm_out_pin;
-  uint8_t led_1 = led_1_pin;
+  uint8_t pwm_pin = PWM_OUT_PIN;
+  uint8_t led_1 = LED_1_PIN;
+  bool pwm_on_flag = false;
   bool smooth_start_on = false;   // если true, значит в данный момент происходит плавный запуск нагрузки
   bool smooth_start_flag = false; // если true, используется плавный запуск нагрузки (например, для плавного запуска источника света), иначе нагрузка сразу стартует с заданной мощностью
 #if __ARDUINO__
-  uint8_t led_2 = led_2_pin;
-  uint8_t led_3 = led_3_pin;
-  uint8_t led_4 = led_4_pin;
+  uint8_t led_2 = LED_2_PIN;
+  uint8_t led_3 = LED_3_PIN;
+  uint8_t led_4 = LED_4_PIN;
 #endif
-  uint8_t led_off = led_off_pin;
+  uint8_t led_off = LED_OFF_PIN;
 
   void set_led_state()
   {
@@ -118,12 +123,12 @@ private:
     if (millis() - timer >= 50)
     {
       timer += 50;
-      digitalWrite(led_off, (pwm_data_index == 0));
-      digitalWrite(led_1, (pwm_data_index >= 1));
+      digitalWrite(led_off, !pwm_on_flag);
+      digitalWrite(led_1, (pwm_data_index >= 0 && pwm_on_flag));
 #if __ARDUINO__
-      digitalWrite(led_2, (pwm_data_index >= 2));
-      digitalWrite(led_3, (pwm_data_index >= 3));
-      digitalWrite(led_4, (pwm_data_index == 4));
+      digitalWrite(led_2, (pwm_data_index >= 1 && pwm_on_flag));
+      digitalWrite(led_3, (pwm_data_index >= 2 && pwm_on_flag));
+      digitalWrite(led_4, (pwm_data_index == 3 && pwm_on_flag));
 #endif
     }
   }
@@ -176,6 +181,14 @@ public:
   // получение текущего значения ШИМ (возвращает индекс значения в массиве pwm_data_table)
   uint8_t get_pwm_data() { return pwm_data_index; }
 
+  bool get_pwm_on_flag() { return pwm_on_flag; }
+
+  void power_on_off(bool on_flag)
+  {
+    pwm_on_flag = on_flag;
+    EEPROM.update(EEPROM_INDEX + 1, (uint8_t)pwm_on_flag);
+  }
+
   // включение/выключение режима плавного пуска нагрузки
   void set_smooth_flag(bool _flag) { smooth_start_flag = _flag; }
 
@@ -186,6 +199,7 @@ public:
   void starting_pwm()
   {
     set_pwm_data(get_start_pwm());
+    power_on_off(true);
     if (smooth_start_flag)
     {
       smooth_start_on = true;
@@ -195,24 +209,46 @@ public:
   void tick()
   {
     static uint8_t old_data_index = 0;
+    static bool old_pwm_on_flag = false;
+
+    set_led_state();
 
     if (smooth_start_on)
     {
       smooth_start_pwm();
+      return;
     }
-    else if (old_data_index != pwm_data_index)
+
+    if (old_pwm_on_flag != pwm_on_flag)
+    {
+      old_pwm_on_flag = pwm_on_flag;
+
+      if (!pwm_on_flag)
+      {
+        analogWrite(pwm_pin, 0);
+        LOG_PRINTLN("power OFF");
+      }
+      else
+      {
+        analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
+        LOG_PRINTLN("power ON");
+        LOG_PRINT("pwm_data: ");
+        LOG_PRINTLN(pwm_data_table[pwm_data_index]);
+      }
+      return;
+    }
+
+    if (old_data_index != pwm_data_index)
     {
       old_data_index = pwm_data_index;
-      analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
-      if (pwm_data_index > 0)
+      EEPROM.update(EEPROM_INDEX, pwm_data_index);
+      if (pwm_on_flag)
       {
-        EEPROM.update(eeprom_index, pwm_data_index);
+        analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
+        LOG_PRINT("pwm_data: ");
+        LOG_PRINTLN(pwm_data_table[pwm_data_index]);
       }
-      LOG_PRINT("pwm_data: ");
-      LOG_PRINTLN(pwm_data_table[pwm_data_index]);
-      EEPROM.update(eeprom_index + 1, (bool)pwm_data_index);
     }
-    set_led_state();
   }
 };
 
@@ -220,12 +256,12 @@ public:
 
 uint8_t get_start_pwm()
 {
-  uint8_t x = EEPROM.read(eeprom_index);
-  if (x >= 5 || x == 0)
+  uint8_t x = EEPROM.read(EEPROM_INDEX);
+  if (x >= sizeof(pwm_data_table))
   // если в памяти записано некорректное значение, устанавливаем минимальный уровень ШИМ
   {
-    x = 1;
-    EEPROM.update(eeprom_index, x);
+    x = 0;
+    EEPROM.update(EEPROM_INDEX, x);
   }
   return (x);
 }
