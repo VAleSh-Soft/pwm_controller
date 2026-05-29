@@ -65,10 +65,10 @@ void check_button()
     {
       // иначе изменить текущий уровень ШИМ
       (btn_up.getLastState() == BTN_ONECLICK) ? x++ : x--;
-      if (x >= 5)
+      if (x >= sizeof(pwm_data_table))
       {
 #ifdef USE_TWO_BUTTONS
-        x = (loop_data_of_pwm) ? 1 : 4;
+        x = (loop_data_of_pwm) ? 1 : (sizeof(pwm_data_table) - 1);
 #else
         x = 1;
 #endif
@@ -76,9 +76,9 @@ void check_button()
       else if (x == 0)
       {
 #ifdef USE_TWO_BUTTONS
-        x = (loop_data_of_pwm) ? 4 : 1;
+        x = (loop_data_of_pwm) ? (sizeof(pwm_data_table) - 1) : 1;
 #else
-        x = 4;
+        x = (sizeof(pwm_data_table) - 1);
 #endif
       }
       pwm_controller.set_pwm_data(x);
