@@ -96,7 +96,7 @@ void setup()
   Serial.begin(9600);
 #endif
 
-// увеличиваем частоту ШИМ
+// увеличиваем частоту максимальную ШИМ
 #if __ARDUINO__
   TCCR1B = TCCR1B & B11111000 | B00000001; // на пинах D9 и D10 (timer1) до 31372.55 Гц
 #elif __DIGISPARK__
