@@ -3,7 +3,7 @@
  * @author Vladimir Shatalov (valesh-soft@yandex.ru)
  * @brief Управление нагрузкой с помощью ШИМ;
  *
- * @version 1.7.4
+ * @version 1.7.5
  * @date 30.05.2026
  *
  * @copyright Copyright (c) 2023-2026
@@ -12,6 +12,7 @@
 
 #include <EEPROM.h>
 #include "header_file.h"
+#include "pc_button.h"
 
 pcButton btn_up(BTN_UP_PIN);
 #ifdef USE_TWO_BUTTONS
@@ -24,7 +25,7 @@ PWM_Controller pwm_controller;
 
 void check_button()
 {
-  int8_t x = pwm_controller.get_pwm_data();
+  uint8_t x = pwm_controller.get_pwm_data();
 
   btn_up.getButtonState();
 #ifdef USE_TWO_BUTTONS

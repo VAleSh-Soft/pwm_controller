@@ -14,7 +14,6 @@
 
 #include <Arduino.h>
 #include <EEPROM.h>
-#include <shButton.h> // https://github.com/VAleSh-Soft/shButton
 
 // ==== Настройки ====================================
 
@@ -276,19 +275,6 @@ void PWM_Controller::tick()
     }
   }
 }
-
-// ===================================================
-
-class pcButton : public shButton
-{
-public:
-  pcButton(uint8_t _pin) : shButton(_pin)
-  {
-    shButton::setVirtualClickOn();
-    shButton::setLongClickMode(LCM_ONLYONCE);
-    shButton::setTimeoutOfLongClick(1000);
-  }
-};
 
 // ===================================================
 
