@@ -3,20 +3,19 @@
  * @author Vladimir Shatalov (valesh-soft@yandex.ru)
  * @brief Управление нагрузкой с помощью ШИМ;
  *
- * @version 1.7.3
- * @date 29.05.2026
+ * @version 1.7.4
+ * @date 30.05.2026
  *
  * @copyright Copyright (c) 2023-2026
  *
  */
 
-#include <shButton.h> // https://github.com/VAleSh-Soft/shButton
 #include <EEPROM.h>
 #include "header_file.h"
 
-shButton btn_up(BTN_UP_PIN);
+pcButton btn_up(BTN_UP_PIN);
 #ifdef USE_TWO_BUTTONS
-shButton btn_down(BTN_DOWN_PIN);
+pcButton btn_down(BTN_DOWN_PIN);
 #endif
 
 PWM_Controller pwm_controller;
@@ -31,10 +30,10 @@ void check_button()
 #ifdef USE_TWO_BUTTONS
   btn_down.getButtonState();
 
-  // при удержании любой кнопки в течение одной секунды нагрузка отключается или включается
+  // при удержании нажатой любой кнопки в течение одной секунды нагрузка отключается или включается
   if (btn_up.getLastState() == BTN_LONGCLICK || btn_down.getLastState() == BTN_LONGCLICK)
 #else
-  // при удержании кнопки в течение одной секунды нагрузка отключается или включается
+  // при удержании нажатой кнопки в течение одной секунды нагрузка отключается или включается
   if (btn_up.getLastState() == BTN_LONGCLICK)
 #endif
   {
@@ -101,15 +100,6 @@ void setup()
   TCCR1B = TCCR1B & B11111000 | B00000001; // на пинах D9 и D10 (timer1) до 31372.55 Гц
 #elif __DIGISPARK__
   TCCR1 = TCCR1 & B11110000 | B00000001; // на пине PB4 (timer1) до 32.2 кГц
-#endif
-  // настраиваем кнопки
-  btn_up.setVirtualClickOn();
-  btn_up.setLongClickMode(LCM_ONLYONCE);
-  btn_up.setTimeoutOfLongClick(1000);
-#ifdef USE_TWO_BUTTONS
-  btn_down.setVirtualClickOn();
-  btn_down.setLongClickMode(LCM_ONLYONCE);
-  btn_down.setTimeoutOfLongClick(1000);
 #endif
 
   pwm_controller.set_smooth_flag(SMOOTH_START);

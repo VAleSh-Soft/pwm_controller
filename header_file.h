@@ -14,6 +14,7 @@
 
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <shButton.h> // https://github.com/VAleSh-Soft/shButton
 
 // ==== Настройки ====================================
 
@@ -115,53 +116,8 @@ private:
 #endif
   uint8_t led_off = LED_OFF_PIN;
 
-  void set_led_state()
-  {
-    static uint32_t timer = millis();
-
-    // состояние светодиодов обновляется 20 раз в секунду
-    if (millis() - timer >= 50)
-    {
-      timer += 50;
-      digitalWrite(led_off, !pwm_on_flag);
-      digitalWrite(led_1, (pwm_data_index >= 0 && pwm_on_flag));
-#if __ARDUINO__
-      digitalWrite(led_2, (pwm_data_index >= 1 && pwm_on_flag));
-      digitalWrite(led_3, (pwm_data_index >= 2 && pwm_on_flag));
-      digitalWrite(led_4, (pwm_data_index == 3 && pwm_on_flag));
-#endif
-    }
-  }
-
-  void smooth_start_pwm()
-  {
-    const uint32_t interval = 10; // наращиваем значение ШИМ каждые 10 мс
-    const uint8_t increment = 5;  // шаг прироста ШИМ
-
-    static uint32_t timer = millis();
-
-    static uint8_t _data = 0;
-
-    if (millis() - timer >= interval)
-    {
-      timer = millis();
-      _data += increment;
-      if ((_data < pwm_data_table[pwm_data_index]) && (_data != increment - 1) && (pwm_data_index != 0))
-      {
-        analogWrite(pwm_pin, _data);
-        LOG_PRINT("pwm_data: ");
-        LOG_PRINTLN(_data);
-      }
-      else
-      {
-        _data = 0;
-        analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
-        smooth_start_on = false;
-        LOG_PRINT("pwm_data: ");
-        LOG_PRINTLN(pwm_data_table[pwm_data_index]);
-      }
-    }
-  }
+  void set_led_state();
+  void smooth_start_pwm();
 
 public:
   PWM_Controller()
@@ -177,78 +133,160 @@ public:
   }
 
   // установка значения ШИМ (в метод передается индекс значения в массиве pwm_data_table)
-  void set_pwm_data(uint8_t _data) { pwm_data_index = _data; }
+  void set_pwm_data(uint8_t _data);
   // получение текущего значения ШИМ (возвращает индекс значения в массиве pwm_data_table)
-  uint8_t get_pwm_data() { return pwm_data_index; }
+  uint8_t get_pwm_data();
 
-  bool get_pwm_on_flag() { return pwm_on_flag; }
+  bool get_pwm_on_flag();
 
-  void power_on_off(bool on_flag)
-  {
-    pwm_on_flag = on_flag;
-    EEPROM.update(EEPROM_INDEX + 1, (uint8_t)pwm_on_flag);
-  }
+  void power_on_off(bool on_flag);
 
   // включение/выключение режима плавного пуска нагрузки
-  void set_smooth_flag(bool _flag) { smooth_start_flag = _flag; }
+  void set_smooth_flag(bool _flag);
 
   // получение текущего состояния режима плавного пуска нагрузки
-  bool get_smooth_flag() { return smooth_start_flag; }
+  bool get_smooth_flag();
 
   // запуск нагрузки
-  void starting_pwm()
+  void starting_pwm();
+
+  void tick();
+};
+
+// ==== private ======================================
+
+void PWM_Controller::smooth_start_pwm()
+{
+  const uint32_t interval = 10; // наращиваем значение ШИМ каждые 10 мс
+  const uint8_t increment = 5;  // шаг прироста ШИМ
+
+  static uint32_t timer = millis();
+
+  static uint8_t _data = 0;
+
+  if (millis() - timer >= interval)
   {
-    set_pwm_data(get_start_pwm());
-    power_on_off(true);
-    if (smooth_start_flag)
+    timer = millis();
+    _data += increment;
+    if ((_data < pwm_data_table[pwm_data_index]) && (_data != increment - 1) && (pwm_data_index != 0))
     {
-      smooth_start_on = true;
+      analogWrite(pwm_pin, _data);
+      LOG_PRINT("pwm_data: ");
+      LOG_PRINTLN(_data);
+    }
+    else
+    {
+      _data = 0;
+      analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
+      smooth_start_on = false;
+      LOG_PRINT("pwm_data: ");
+      LOG_PRINTLN(pwm_data_table[pwm_data_index]);
     }
   }
+}
 
-  void tick()
+void PWM_Controller::set_led_state()
+{
+  static uint32_t timer = millis();
+
+  // состояние светодиодов обновляется 20 раз в секунду
+  if (millis() - timer >= 50)
   {
-    static uint8_t old_data_index = 0;
-    static bool old_pwm_on_flag = false;
+    timer += 50;
+    digitalWrite(led_off, !pwm_on_flag);
+    digitalWrite(led_1, (pwm_data_index >= 0 && pwm_on_flag));
+#if __ARDUINO__
+    digitalWrite(led_2, (pwm_data_index >= 1 && pwm_on_flag));
+    digitalWrite(led_3, (pwm_data_index >= 2 && pwm_on_flag));
+    digitalWrite(led_4, (pwm_data_index == 3 && pwm_on_flag));
+#endif
+  }
+}
 
-    set_led_state();
+// ==== public =======================================
 
-    if (smooth_start_on)
+void PWM_Controller::set_pwm_data(uint8_t _data) { pwm_data_index = _data; }
+// получение текущего значения ШИМ (возвращает индекс значения в массиве pwm_data_table)
+uint8_t PWM_Controller::get_pwm_data() { return pwm_data_index; }
+
+bool PWM_Controller::get_pwm_on_flag() { return pwm_on_flag; }
+
+void PWM_Controller::power_on_off(bool on_flag)
+{
+  pwm_on_flag = on_flag;
+  EEPROM.update(EEPROM_INDEX + 1, (uint8_t)pwm_on_flag);
+}
+
+void PWM_Controller::set_smooth_flag(bool _flag) { smooth_start_flag = _flag; }
+
+// получение текущего состояния режима плавного пуска нагрузки
+bool PWM_Controller::get_smooth_flag() { return smooth_start_flag; }
+
+void PWM_Controller::starting_pwm()
+{
+  set_pwm_data(get_start_pwm());
+  power_on_off(true);
+  if (smooth_start_flag)
+  {
+    smooth_start_on = true;
+  }
+}
+
+void PWM_Controller::tick()
+{
+  static uint8_t old_data_index = 0;
+  static bool old_pwm_on_flag = false;
+
+  set_led_state();
+
+  if (smooth_start_on)
+  {
+    smooth_start_pwm();
+    return;
+  }
+
+  if (old_pwm_on_flag != pwm_on_flag)
+  {
+    old_pwm_on_flag = pwm_on_flag;
+
+    if (!pwm_on_flag)
     {
-      smooth_start_pwm();
-      return;
+      analogWrite(pwm_pin, 0);
+      LOG_PRINTLN("power OFF");
     }
-
-    if (old_pwm_on_flag != pwm_on_flag)
+    else
     {
-      old_pwm_on_flag = pwm_on_flag;
-
-      if (!pwm_on_flag)
-      {
-        analogWrite(pwm_pin, 0);
-        LOG_PRINTLN("power OFF");
-      }
-      else
-      {
-        analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
-        LOG_PRINTLN("power ON");
-        LOG_PRINT("pwm_data: ");
-        LOG_PRINTLN(pwm_data_table[pwm_data_index]);
-      }
-      return;
+      analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
+      LOG_PRINTLN("power ON");
+      LOG_PRINT("pwm_data: ");
+      LOG_PRINTLN(pwm_data_table[pwm_data_index]);
     }
+    return;
+  }
 
-    if (old_data_index != pwm_data_index)
+  if (old_data_index != pwm_data_index)
+  {
+    old_data_index = pwm_data_index;
+    EEPROM.update(EEPROM_INDEX, pwm_data_index);
+    if (pwm_on_flag)
     {
-      old_data_index = pwm_data_index;
-      EEPROM.update(EEPROM_INDEX, pwm_data_index);
-      if (pwm_on_flag)
-      {
-        analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
-        LOG_PRINT("pwm_data: ");
-        LOG_PRINTLN(pwm_data_table[pwm_data_index]);
-      }
+      analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
+      LOG_PRINT("pwm_data: ");
+      LOG_PRINTLN(pwm_data_table[pwm_data_index]);
     }
+  }
+}
+
+// ===================================================
+
+class pcButton : public shButton
+{
+public:
+  pcButton(uint8_t _pin) : shButton(_pin)
+  {
+    shButton::setVirtualClickOn();
+    shButton::setLongClickMode(LCM_ONLYONCE);
+    shButton::setTimeoutOfLongClick(1000);
   }
 };
 
