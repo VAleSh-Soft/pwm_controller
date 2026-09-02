@@ -92,18 +92,16 @@ void check_button()
 
 void setup()
 {
-#ifdef LOG_ON
-  Serial.begin(9600);
+#if LOG_ON > 0
+  Serial.begin(115200);
 #endif
 
-// увеличиваем частоту максимальную ШИМ
+// увеличиваем максимальную частоту ШИМ
 #if __ARDUINO__
   TCCR1B = TCCR1B & B11111000 | B00000001; // на пинах D9 и D10 (timer1) до 31372.55 Гц
 #elif __DIGISPARK__
   TCCR1 = TCCR1 & B11110000 | B00000001; // на пине PB4 (timer1) до 32.2 кГц
 #endif
-
-  pwm_controller.set_smooth_flag(SMOOTH_START);
 
   // запускаем нагрузку с сохраненным уровнем ШИМ
   if ((bool)EEPROM.read(EEPROM_INDEX + 1))

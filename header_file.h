@@ -18,27 +18,28 @@
 // ==== Настройки ====================================
 
 #if __ARDUINO__
-// Вывод отладочной информации в Serial; используется только для Ардуино
-#define LOG_ON
+// Вывод отладочной информации в Serial; не используется для ATtiny
+#define LOG_ON 1
 
 #endif
 
 // использовать две кнопки для управления регулятором
 #define USE_TWO_BUTTONS
 
-// таблица управления нагревателем, линейная зависимость: например 39%, 59%, 78% и 98%
+// таблица управления нагревателем, линейная зависимость: здесь 39%, 59%, 78% и 98% мощности
 // uint8_t const pwm_data_table[] = {100, 150, 200, 250};
-// таблица управления светодиодной лентой, нелинейная зависимость: например 12%, 24%, 49% и 98%
+// таблица управления светодиодной лентой, нелинейная зависимость: здесь 12%, 24%, 49% и 100% мощности
 uint8_t const pwm_data_table[] = {30, 60, 125, 255};
 
 #ifdef USE_TWO_BUTTONS
+
 // закольцевать перебор значений ШИМ кнопками
 constexpr bool LOOP_DATA_OF_PWM = false;
 
 #endif
 
 // плавный запуск ШИМ
-constexpr bool SMOOTH_START = true;
+constexpr bool SMOOTH_START = false;
 
 // ===================================================
 
@@ -52,6 +53,9 @@ constexpr uint8_t LED_1_PIN = 7;
 constexpr uint8_t LED_2_PIN = 6;
 constexpr uint8_t LED_3_PIN = 5;
 constexpr uint8_t LED_4_PIN = 4;
+
+// пины для подключения зеленых индикаторных светодиодов
+uint8_t const led_pins[] = {7, 6, 5, 4};
 constexpr uint8_t LED_OFF_PIN = 8;
 
 constexpr uint8_t PWM_OUT_PIN = 10;
@@ -63,7 +67,9 @@ constexpr uint8_t BTN_DOWN_PIN = 2;
 
 // настройка пинов для подключения кнопок, светодиодов и выхода ШИМ для Attiny45/85
 #elif __DIGISPARK__
-constexpr uint8_t LED_1_PIN = 1;
+
+// пин для подключения зеленого индикаторного светодиода
+uint8_t const led_pins[] = {1};
 constexpr uint8_t LED_OFF_PIN = 0;
 
 constexpr uint8_t PWM_OUT_PIN = 4;
@@ -77,7 +83,7 @@ constexpr uint8_t BTN_DOWN_PIN = 3;
 
 // ===================================================
 
-#ifdef LOG_ON
+#if LOG_ON > 0
 
 #define LOG_PRINT(x) Serial.print(x)
 #define LOG_PRINTLN(x) Serial.println(x)
@@ -103,17 +109,8 @@ class PWM_Controller
 {
 private:
   uint8_t pwm_data_index = 0;
-  uint8_t pwm_pin = PWM_OUT_PIN;
-  uint8_t led_1 = LED_1_PIN;
-  bool pwm_on_flag = false;
-  bool smooth_start_on = false;   // если true, значит в данный момент происходит плавный запуск нагрузки
-  bool smooth_start_flag = false; // если true, используется плавный запуск нагрузки (например, для плавного запуска источника света), иначе нагрузка сразу стартует с заданной мощностью
-#if __ARDUINO__
-  uint8_t led_2 = LED_2_PIN;
-  uint8_t led_3 = LED_3_PIN;
-  uint8_t led_4 = LED_4_PIN;
-#endif
-  uint8_t led_off = LED_OFF_PIN;
+  bool pwm_on_flag = false;     // флаг работы ШИМ
+  bool smooth_start_on = false; // если true, значит в данный момент происходит плавный запуск нагрузки
 
   void set_led_state();
   void smooth_start_pwm();
@@ -121,30 +118,22 @@ private:
 public:
   PWM_Controller()
   {
-    pinMode(led_1, OUTPUT);
-#if __ARDUINO__
-    pinMode(led_2, OUTPUT);
-    pinMode(led_3, OUTPUT);
-    pinMode(led_4, OUTPUT);
-#endif
-    pinMode(led_off, OUTPUT);
-    pinMode(pwm_pin, OUTPUT);
+    for (uint8_t i = 0; i < sizeof(led_pins); i++)
+    {
+      pinMode(led_pins[i], OUTPUT);
+    }
+    pinMode(LED_OFF_PIN, OUTPUT);
+    pinMode(PWM_OUT_PIN, OUTPUT);
   }
 
   // установка значения ШИМ (в метод передается индекс значения в массиве pwm_data_table)
   void set_pwm_data(uint8_t _data);
   // получение текущего значения ШИМ (возвращает индекс значения в массиве pwm_data_table)
   uint8_t get_pwm_data();
-
+  // получение текущего состояния работы ШИМ (включен/выключен)
   bool get_pwm_on_flag();
-
+  // включение/выключение ШИМ
   void power_on_off(bool on_flag);
-
-  // включение/выключение режима плавного пуска нагрузки
-  void set_smooth_flag(bool _flag);
-
-  // получение текущего состояния режима плавного пуска нагрузки
-  bool get_smooth_flag();
 
   // запуск нагрузки
   void starting_pwm();
@@ -167,16 +156,16 @@ void PWM_Controller::smooth_start_pwm()
   {
     timer = millis();
     _data += increment;
-    if ((_data < pwm_data_table[pwm_data_index]) && (_data != increment - 1) && (pwm_data_index != 0))
+    if ((_data < pwm_data_table[pwm_data_index]) && (_data != increment - 1))
     {
-      analogWrite(pwm_pin, _data);
+      analogWrite(PWM_OUT_PIN, _data);
       LOG_PRINT("pwm_data: ");
       LOG_PRINTLN(_data);
     }
     else
     {
       _data = 0;
-      analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
+      analogWrite(PWM_OUT_PIN, pwm_data_table[pwm_data_index]);
       smooth_start_on = false;
       LOG_PRINT("pwm_data: ");
       LOG_PRINTLN(pwm_data_table[pwm_data_index]);
@@ -192,13 +181,11 @@ void PWM_Controller::set_led_state()
   if (millis() - timer >= 50)
   {
     timer += 50;
-    digitalWrite(led_off, !pwm_on_flag);
-    digitalWrite(led_1, (pwm_data_index >= 0 && pwm_on_flag));
-#if __ARDUINO__
-    digitalWrite(led_2, (pwm_data_index >= 1 && pwm_on_flag));
-    digitalWrite(led_3, (pwm_data_index >= 2 && pwm_on_flag));
-    digitalWrite(led_4, (pwm_data_index == 3 && pwm_on_flag));
-#endif
+    digitalWrite(LED_OFF_PIN, !pwm_on_flag);
+    for (uint8_t i = 0; i < sizeof(led_pins); i++)
+    {
+      digitalWrite(led_pins[i], (pwm_data_index >= i) && pwm_on_flag);
+    }
   }
 }
 
@@ -216,19 +203,11 @@ void PWM_Controller::power_on_off(bool on_flag)
   EEPROM.update(EEPROM_INDEX + 1, (uint8_t)pwm_on_flag);
 }
 
-void PWM_Controller::set_smooth_flag(bool _flag) { smooth_start_flag = _flag; }
-
-// получение текущего состояния режима плавного пуска нагрузки
-bool PWM_Controller::get_smooth_flag() { return smooth_start_flag; }
-
 void PWM_Controller::starting_pwm()
 {
   set_pwm_data(get_start_pwm());
   power_on_off(true);
-  if (smooth_start_flag)
-  {
-    smooth_start_on = true;
-  }
+  smooth_start_on = SMOOTH_START;
 }
 
 void PWM_Controller::tick()
@@ -250,12 +229,12 @@ void PWM_Controller::tick()
 
     if (!pwm_on_flag)
     {
-      analogWrite(pwm_pin, 0);
+      analogWrite(PWM_OUT_PIN, 0);
       LOG_PRINTLN("power OFF");
     }
     else
     {
-      analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
+      analogWrite(PWM_OUT_PIN, pwm_data_table[pwm_data_index]);
       LOG_PRINTLN("power ON");
       LOG_PRINT("pwm_data: ");
       LOG_PRINTLN(pwm_data_table[pwm_data_index]);
@@ -269,7 +248,7 @@ void PWM_Controller::tick()
     EEPROM.update(EEPROM_INDEX, pwm_data_index);
     if (pwm_on_flag)
     {
-      analogWrite(pwm_pin, pwm_data_table[pwm_data_index]);
+      analogWrite(PWM_OUT_PIN, pwm_data_table[pwm_data_index]);
       LOG_PRINT("pwm_data: ");
       LOG_PRINTLN(pwm_data_table[pwm_data_index]);
     }
