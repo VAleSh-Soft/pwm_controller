@@ -49,10 +49,6 @@ constexpr uint16_t EEPROM_INDEX = 10;
 
 // настройка пинов для подключения кнопок, светодиодов и выхода ШИМ для Arduino
 #if __ARDUINO__
-constexpr uint8_t LED_1_PIN = 7;
-constexpr uint8_t LED_2_PIN = 6;
-constexpr uint8_t LED_3_PIN = 5;
-constexpr uint8_t LED_4_PIN = 4;
 
 // пины для подключения зеленых индикаторных светодиодов
 uint8_t const led_pins[] = {7, 6, 5, 4};
