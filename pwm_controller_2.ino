@@ -1,10 +1,10 @@
 /**
  * @file pwm_controller_2.ino
  * @author Vladimir Shatalov (valesh-soft@yandex.ru)
- * @brief Управление нагрузкой с помощью ШИМ;
+ * @brief Ступенчатое управление нагрузкой с помощью ШИМ;
  *
  * @version 1.7.7
- * @date 30.05.2026
+ * @date 03.09.2026
  *
  * @copyright Copyright (c) 2023-2026
  *
