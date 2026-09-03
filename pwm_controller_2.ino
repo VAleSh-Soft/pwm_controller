@@ -3,7 +3,7 @@
  * @author Vladimir Shatalov (valesh-soft@yandex.ru)
  * @brief Управление нагрузкой с помощью ШИМ;
  *
- * @version 1.7.5
+ * @version 1.7.7
  * @date 30.05.2026
  *
  * @copyright Copyright (c) 2023-2026
@@ -69,6 +69,7 @@ void check_button()
       // при выходе за пределы диапазона устанавливаем значение в зависимости от направления изменения
       // учитывая, закольцован или нет перебор значений ШИМ
       if (x >= sizeof(pwm_data_table))
+      {
         if (btn_up.getLastState() == BTN_ONECLICK)
         {
 #ifdef USE_TWO_BUTTONS
@@ -85,6 +86,7 @@ void check_button()
           x = (sizeof(pwm_data_table) - 1);
 #endif
         }
+      }
       pwm_controller.set_pwm_data(x);
     }
   }
@@ -98,9 +100,9 @@ void setup()
 
 // увеличиваем максимальную частоту ШИМ
 #if __ARDUINO__
-  TCCR1B = TCCR1B & B11111000 | B00000001; // на пинах D9 и D10 (timer1) до 31372.55 Гц
+  TCCR1B = (TCCR1B & B11111000) | B00000001; // на пинах D9 и D10 (timer1) до 31372.55 Гц
 #elif __DIGISPARK__
-  TCCR1 = TCCR1 & B11110000 | B00000001; // на пине PB4 (timer1) до 32.2 кГц
+  TCCR1 = (TCCR1 & B11110000) | B00000001; // на пине PB4 (timer1) до 32.2 кГц
 #endif
 
   // запускаем нагрузку с сохраненным уровнем ШИМ

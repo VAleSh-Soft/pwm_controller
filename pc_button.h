@@ -1,4 +1,4 @@
-#pragma.once
+#pragma once
 
 #include <shButton.h> // https://github.com/VAleSh-Soft/shButton
 
