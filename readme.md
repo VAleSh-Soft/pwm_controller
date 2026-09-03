@@ -42,15 +42,15 @@
 
 ### Схема подключения
 
-Arduino:
+**Arduino** (**ATmega168/328**):
 
 ![Arduino](doc/Schematic_pwm_controller_2_Arduino.png)
 
-Digispark:
+**Digispark** (**ATtiny45/85**):
 
 ![Digispark](doc/Schematic_pwm_controller_2_Digispark.png)
 
-Пины для подключения кнопок, светодиодов и вывода ШИМ определяются в блоках __ARDUINO__ (для **Arduino**) и __DIGISPARK__ (для **Attiny45/85**);
+Пины для подключения кнопок, светодиодов и вывода ШИМ определяются в блоках `__ARDUINO__` (для **Arduino**) и `__DIGISPARK__` (для **Attiny45/85**) в файле **header_file.h**;
 
  ### Использованные сторонние библиотеки
 
