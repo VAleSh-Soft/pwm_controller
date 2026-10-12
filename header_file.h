@@ -17,11 +17,8 @@
 
 // ==== Настройки ====================================
 
-#if __ARDUINO__
-// Вывод отладочной информации в Serial; не используется для ATtiny
-#define LOG_ON 1
-
-#endif
+// Вывод отладочной информации в Serial; для ATtiny 85/45 не используется в любом случае
+#define USE_DEBUG 1
 
 // использовать две кнопки для управления регулятором
 #define USE_TWO_BUTTONS
@@ -39,16 +36,15 @@ constexpr bool LOOP_DATA_OF_PWM = false;
 #endif
 
 // плавный запуск ШИМ
-constexpr bool SMOOTH_START = false;
+constexpr bool SMOOTH_START = true;
 
-// ===================================================
-
+// индекс ячейки в EEPROM для сохранения настроек (всего 2 байтм)
 constexpr uint16_t EEPROM_INDEX = 10;
 
 // ============================================================================
 
-// настройка пинов для подключения кнопок, светодиодов и выхода ШИМ для Arduino
 #if __ARDUINO__
+// настройка пинов для подключения кнопок, светодиодов и выхода ШИМ для Arduino
 
 // пины для подключения зеленых индикаторных светодиодов
 uint8_t const led_pins[] = {7, 6, 5, 4};
@@ -61,8 +57,8 @@ constexpr uint8_t BTN_UP_PIN = 3;
 constexpr uint8_t BTN_DOWN_PIN = 2;
 #endif
 
-// настройка пинов для подключения кнопок, светодиодов и выхода ШИМ для Attiny45/85
 #elif __DIGISPARK__
+// настройка пинов для подключения кнопок, светодиодов и выхода ШИМ для Attiny45/85
 
 // пин для подключения зеленого индикаторного светодиода
 uint8_t const led_pins[] = {1};
@@ -79,15 +75,26 @@ constexpr uint8_t BTN_DOWN_PIN = 3;
 
 // ===================================================
 
-#if LOG_ON > 0
+#if __DIGISPARK__
 
-#define LOG_PRINT(x) Serial.print(x)
-#define LOG_PRINTLN(x) Serial.println(x)
-
-#else
+// ATtiny и прочие платы: Serial не используется
+#define LOG_ON 0
 
 #define LOG_PRINT(x)
 #define LOG_PRINTLN(x)
+
+#else
+
+// Вывод отладочной информации в Serial
+#define LOG_ON USE_DEBUG
+
+#if LOG_ON > 0
+#define LOG_PRINT(x) Serial.print(x)
+#define LOG_PRINTLN(x) Serial.println(x)
+#else
+#define LOG_PRINT(x)
+#define LOG_PRINTLN(x)
+#endif
 
 #endif
 
@@ -196,6 +203,13 @@ bool PWM_Controller::get_pwm_on_flag() { return pwm_on_flag; }
 void PWM_Controller::power_on_off(bool on_flag)
 {
   pwm_on_flag = on_flag;
+  if (!on_flag)
+  {
+    // прерываем плавный запуск и немедленно обесточиваем нагрузку: иначе tick()
+    // продолжит наращивать ШИМ до целевого уровня при выключенном девайсе
+    smooth_start_on = false;
+    analogWrite(PWM_OUT_PIN, 0);
+  }
   EEPROM.update(EEPROM_INDEX + 1, (uint8_t)pwm_on_flag);
 }
 
@@ -222,6 +236,15 @@ void PWM_Controller::tick()
   if (old_pwm_on_flag != pwm_on_flag)
   {
     old_pwm_on_flag = pwm_on_flag;
+    // при смене состояния мог измениться и уровень ШИМ: при запуске нагрузки
+    // восстанавливается сохраненное значение либо уровень успели изменить во время
+    // плавного запуска - сохраняем его и синхронизируем индекс, чтобы на следующем
+    // шаге не выполнить повторный analogWrite()
+    if (old_data_index != pwm_data_index)
+    {
+      old_data_index = pwm_data_index;
+      EEPROM.update(EEPROM_INDEX, pwm_data_index);
+    }
 
     if (!pwm_on_flag)
     {

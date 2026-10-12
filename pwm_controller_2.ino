@@ -3,8 +3,8 @@
  * @author Vladimir Shatalov (valesh-soft@yandex.ru)
  * @brief Ступенчатое управление нагрузкой с помощью ШИМ;
  *
- * @version 1.7.7
- * @date 03.09.2026
+ * @version 1.7.8
+ * @date 11.10.2026
  *
  * @copyright Copyright (c) 2023-2026
  *
@@ -63,30 +63,29 @@ void check_button()
     }
     else
     {
-      // иначе изменить текущий уровень ШИМ
-      (btn_up.getLastState() == BTN_ONECLICK) ? x++ : x--;
+#ifdef USE_TWO_BUTTONS
+      // иначе изменить текущий уровень ШИМ в сторону, определенную нажатой кнопкой
+      const bool up = (btn_up.getLastState() == BTN_ONECLICK);
+      x = up ? (uint8_t)(x + 1) : (uint8_t)(x - 1);
 
       // при выходе за пределы диапазона устанавливаем значение в зависимости от направления изменения
       // учитывая, закольцован или нет перебор значений ШИМ
       if (x >= sizeof(pwm_data_table))
       {
-        if (btn_up.getLastState() == BTN_ONECLICK)
+        if (up)
         {
-#ifdef USE_TWO_BUTTONS
           x = (LOOP_DATA_OF_PWM) ? 0 : (sizeof(pwm_data_table) - 1);
-#else
-          x = 0;
-#endif
         }
         else
         {
-#ifdef USE_TWO_BUTTONS
           x = (LOOP_DATA_OF_PWM) ? (sizeof(pwm_data_table) - 1) : 0;
-#else
-          x = (sizeof(pwm_data_table) - 1);
-#endif
         }
       }
+#else
+      // иначе увеличить текущий уровень ШИМ на один пункт;
+      // при одной кнопке перебор значений в любом случае закольцован
+      x = ((size_t)x + 1 >= sizeof(pwm_data_table)) ? 0 : (uint8_t)(x + 1);
+#endif
       pwm_controller.set_pwm_data(x);
     }
   }
@@ -116,6 +115,6 @@ void setup()
 
 void loop()
 {
-  check_button();
   pwm_controller.tick();
+  check_button();
 }
